@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Register with Phone Number</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      border-radius: 10px;
+      padding: 30px 40px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      width: 360px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 15px;
+      border: 1.5px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #4a90e2;
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin-bottom: 10px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background: #357ABD;
+    }
+    #recaptcha-container {
+      margin-bottom: 15px;
+    }
+    .hidden {
+      display: none;
+    }
+    .message {
+      text-align: center;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+    .error {
+      color: #d93025;
+    }
+    .success {
+      color: #188038;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Register with Phone</h2>
+    <div id="message" class="message"></div>
+
+    <!-- Step 1: Phone input -->
+    <div id="phone-step">
+      <input type="tel" id="phoneNumber" placeholder="+91 9876543210" />
+      <div id="recaptcha-container"></div>
+      <button id="sendOTPBtn">Send OTP</button>
+    </div>
+
+    <!-- Step 2: OTP input -->
+    <div id="otp-step" class="hidden">
+      <input type="text" id="otpCode" placeholder="Enter OTP" maxlength="6" />
+      <button id="verifyOTPBtn">Verify OTP</button>
+    </div>
+
+    <!-- Step 3: Registration form -->
+    <form id="register-form" class="hidden">
+      <input type="text" id="fullName" placeholder="Full Name" required minlength="3" />
+      <input type="email" id="email" placeholder="Email (optional)" />
+      <input type="password" id="password" placeholder="Password (min 6 chars)" required minlength="6" />
+      <button type="submit">Complete Registration</button>
+    </form>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Your Firebase config here
+    const firebaseConfig = {
+      apiKey: "AIzaSyBlqFFg5NHMpVmWon94ZPEXAIlhAW6TsHM",
+      authDomain: "codetodream-f0ed4.firebaseapp.com",
+      projectId: "codetodream-f0ed4",
+      storageBucket: "codetodream-f0ed4.appspot.com",
+      messagingSenderId: "197646785636",
+      appId: "1:197646785636:web:2a89663eea3baa10171371"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // Elements
+    const phoneStep = document.getElementById('phone-step');
+    const otpStep = document.getElementById('otp-step');
+    const registerForm = document.getElementById('register-form');
+    const messageDiv = document.getElementById('message');
+    const sendOTPBtn = document.getElementById('sendOTPBtn');
+    const verifyOTPBtn = document.getElementById('verifyOTPBtn');
+
+    let confirmationResult = null; // To store the verification id
+
+    // Setup invisible reCAPTCHA
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      size: 'invisible',
+      callback: (response) => {
+        // reCAPTCHA solved
+      }
+    });
+
+    function showMessage(text, isError = false) {
+      messageDiv.textContent = text;
+      if (isError) {
+        messageDiv.classList.add('error');
+        messageDiv.classList.remove('success');
+      } else {
+        messageDiv.classList.add('success');
+        messageDiv.classList.remove('error');
+      }
+    }
+
+    // Send OTP
+    sendOTPBtn.addEventListener('click', () => {
+      const phoneNumber = document.getElementById('phoneNumber').value.trim();
+      if (!phoneNumber) {
+        showMessage('Please enter a valid phone number including country code.', true);
+        return;
+      }
+      sendOTPBtn.disabled = true;
+      showMessage('Sending OTP...');
+
+      const appVerifier = window.recaptchaVerifier;
+      auth.signInWithPhoneNumber(phoneNumber, appVerifier)
+        .then((result) => {
+          confirmationResult = result;
+          showMessage('OTP sent! Please check your phone.');
+          phoneStep.classList.add('hidden');
+          otpStep.classList.remove('hidden');
+          sendOTPBtn.disabled = false;
+        })
+        .catch((error) => {
+          showMessage(error.message || 'Error sending OTP', true);
+          sendOTPBtn.disabled = false;
+          window.recaptchaVerifier.render().then(widgetId => {
+            grecaptcha.reset(widgetId);
+          });
+        });
+    });
+
+    // Verify OTP
+    verifyOTPBtn.addEventListener('click', () => {
+      const otpCode = document.getElementById('otpCode').value.trim();
+      if (otpCode.length !== 6) {
+        showMessage('Please enter a 6-digit OTP.', true);
+        return;
+      }
+      verifyOTPBtn.disabled = true;
+      showMessage('Verifying OTP...');
+
+      confirmationResult.confirm(otpCode)
+        .then((result) => {
+          const user = result.user;
+          showMessage('Phone verified! Please complete registration.');
+          otpStep.classList.add('hidden');
+          registerForm.classList.remove('hidden');
+
+          // Store user phone number to use later on registration
+          registerForm.dataset.phoneNumber = user.phoneNumber;
+
+          verifyOTPBtn.disabled = false;
+        })
+        .catch((error) => {
+          showMessage('Invalid OTP. Try again.', true);
+          verifyOTPBtn.disabled = false;
+        });
+    });
+
+    // Register form submit
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showMessage('');
+
+      const fullName = document.getElementById('fullName').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const phoneNumber = registerForm.dataset.phoneNumber;
+
+      if (fullName.length < 3) {
+        showMessage('Full name must be at least 3 characters.', true);
+        return;
+      }
+      if (password.length < 6) {
+        showMessage('Password must be at least 6 characters.', true);
+        return;
+      }
+
+      try {
+        // Update user profile with email/password and full name
+
+        // Since user is signed in by phone, link email/password credentials
+        const credential = firebase.auth.EmailAuthProvider.credential(email, password);
+
+        // Link email/password to phone auth user
+        await auth.currentUser.linkWithCredential(credential);
+
+        // Update profile
+        await auth.currentUser.updateProfile({
+          displayName: fullName,
+          email: email || null
+        });
+
+        // Save user details in Firestore
+        await db.collection('users').doc(auth.currentUser.uid).set({
+          fullName,
+          email,
+          phoneNumber,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          userId: Math.floor(100000 + Math.random() * 900000).toString()
+        });
+
+        showMessage('Registration complete! Redirecting...', false);
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 1500);
+
+      } catch (err) {
+        if (err.code === 'auth/email-already-in-use') {
+          showMessage('Email already in use. Try logging in.', true);
+        } else {
+          showMessage(err.message || 'Registration failed.', true);
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>

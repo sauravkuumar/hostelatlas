@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manage Cities</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-light">
+  <div class="container py-5">
+    <h2 class="mb-4 text-center">Add / Manage Cities</h2>
+
+    <!-- Add City Form -->
+    <form id="cityForm" class="mx-auto" style="max-width: 400px;">
+      <div class="mb-3">
+        <label for="cityName" class="form-label">City Name</label>
+        <input type="text" id="cityName" class="form-control" placeholder="Enter city name" required />
+      </div>
+
+      <div class="mb-3">
+        <label for="cityImage" class="form-label">Image URL</label>
+        <input type="url" id="cityImage" class="form-control" placeholder="Enter image URL" required />
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" id="submitBtn">Add City</button>
+      <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="cancelEditBtn">Cancel Edit</button>
+    </form>
+
+    <div id="msg" class="mt-3 text-center"></div>
+
+    <!-- Cities List -->
+    <h3 class="mt-5 mb-3 text-center">Uploaded Cities</h3>
+    <div id="citiesList" class="list-group mx-auto" style="max-width: 700px;"></div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBlqFFg5NHMpVmWon94ZPEXAIlhAW6TsHM",
+      authDomain: "codetodream-f0ed4.firebaseapp.com",
+      databaseURL: "https://codetodream-f0ed4-default-rtdb.firebaseio.com",
+      projectId: "codetodream-f0ed4",
+      storageBucket: "codetodream-f0ed4.appspot.com",
+      messagingSenderId: "197646785636",
+      appId: "1:197646785636:web:2a89663eea3baa10171371"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const form = document.getElementById('cityForm');
+    const msg = document.getElementById('msg');
+    const citiesList = document.getElementById('citiesList');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+    let editDocId = null; // Track which city doc is being edited
+
+    // Add or Update City
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const name = document.getElementById('cityName').value.trim();
+      const image = document.getElementById('cityImage').value.trim();
+
+      if (!name || !image) {
+        msg.textContent = "Please fill in all fields.";
+        msg.className = "text-danger";
+        return;
+      }
+
+      msg.textContent = editDocId ? "Updating city..." : "Adding city...";
+      msg.className = "text-muted";
+
+      if (editDocId) {
+        // Update existing city
+        db.collection('cities').doc(editDocId).update({ name, image })
+          .then(() => {
+            msg.textContent = "City updated successfully!";
+            msg.className = "text-success";
+            resetForm();
+            loadCities();
+          })
+          .catch(err => {
+            msg.textContent = "Error updating city: " + err.message;
+            msg.className = "text-danger";
+          });
+      } else {
+        // Add new city
+        db.collection('cities').add({ name, image })
+          .then(() => {
+            msg.textContent = "City added successfully!";
+            msg.className = "text-success";
+            form.reset();
+            loadCities();
+          })
+          .catch(err => {
+            msg.textContent = "Error adding city: " + err.message;
+            msg.className = "text-danger";
+          });
+      }
+    });
+
+    // Load cities and display
+    function loadCities() {
+      citiesList.innerHTML = '<div class="text-center text-muted p-3">Loading cities...</div>';
+      db.collection('cities').orderBy('name').get()
+        .then(snapshot => {
+          if (snapshot.empty) {
+            citiesList.innerHTML = '<p class="text-center w-100">No cities found.</p>';
+            return;
+          }
+
+          citiesList.innerHTML = '';
+          snapshot.forEach(doc => {
+            const city = doc.data();
+            citiesList.appendChild(createCityListItem(doc.id, city));
+          });
+        })
+        .catch(err => {
+          citiesList.innerHTML = `<p class="text-danger text-center">Failed to load cities: ${err.message}</p>`;
+        });
+    }
+
+    // Create city list item with Edit & Delete buttons
+    function createCityListItem(id, city) {
+      const div = document.createElement('div');
+      div.className = 'list-group-item d-flex align-items-center justify-content-between';
+
+      div.innerHTML = `
+        <div class="d-flex align-items-center gap-3">
+          <img src="${city.image}" alt="${city.name}" style="width:60px; height:40px; object-fit:cover; border-radius:6px;">
+          <div>
+            <strong>${city.name}</strong><br/>
+            <small class="text-muted">${city.image}</small>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-outline-primary me-2 edit-btn">Edit</button>
+          <button class="btn btn-sm btn-outline-danger delete-btn">Delete</button>
+        </div>
+      `;
+
+      // Edit button click
+      div.querySelector('.edit-btn').onclick = () => {
+        editDocId = id;
+        document.getElementById('cityName').value = city.name;
+        document.getElementById('cityImage').value = city.image;
+        submitBtn.textContent = "Update City";
+        cancelEditBtn.classList.remove('d-none');
+        msg.textContent = "";
+      };
+
+      // Delete button click
+      div.querySelector('.delete-btn').onclick = () => {
+        if (confirm(`Are you sure you want to delete city "${city.name}"?`)) {
+          db.collection('cities').doc(id).delete()
+            .then(() => {
+              msg.textContent = "City deleted successfully!";
+              msg.className = "text-success";
+              if(editDocId === id) resetForm();
+              loadCities();
+            })
+            .catch(err => {
+              msg.textContent = "Error deleting city: " + err.message;
+              msg.className = "text-danger";
+            });
+        }
+      };
+
+      return div;
+    }
+
+    // Reset form after add/update or cancel
+    function resetForm() {
+      form.reset();
+      editDocId = null;
+      submitBtn.textContent = "Add City";
+      cancelEditBtn.classList.add('d-none');
+      msg.textContent = "";
+    }
+
+    // Cancel edit button click
+    cancelEditBtn.addEventListener('click', resetForm);
+
+    // Initial load
+    window.onload = () => {
+      loadCities();
+    };
+  </script>
+</body>
+</html>

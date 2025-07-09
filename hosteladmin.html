@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Add Listing</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .form-section {
+      max-width: 800px;
+      margin: 40px auto;
+      background-color: #f9f9f9;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container d-flex justify-content-between align-items-center">
+      <a class="navbar-brand" href="#">Admin Panel</a>
+      <div id="userEmail" class="text-white small"></div>
+    </div>
+  </nav>
+
+  <section class="form-section">
+    <h2 class="mb-4">Add Hostel/PG/Flat</h2>
+    <form id="listingForm">
+      <div class="mb-3">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="type">
+          <option value="hostel">Hostel</option>
+          <option value="pg">PG</option>
+          <option value="flat">Flat</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-control" id="name" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">City</label>
+        <input type="text" class="form-control" id="city" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">State</label>
+        <input type="text" class="form-control" id="state" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Address</label>
+        <textarea class="form-control" id="address" rows="2"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Rate (₹)</label>
+        <input type="number" class="form-control" id="rate" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Facilities</label>
+        <textarea class="form-control" id="facilities" placeholder="WiFi, AC, Parking..."></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" id="description" rows="3"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Choose Image <span class="text-danger">*</span></label>
+        <input type="file" class="form-control" id="imageFile" accept="image/*" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Choose Video (optional)</label>
+        <input type="file" class="form-control" id="videoFile" accept="video/*">
+      </div>
+      <button type="submit" class="btn btn-primary">Add Listing</button>
+    </form>
+  </section>
+
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-storage-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBlqFFg5NHMpVmWon94ZPEXAIlhAW6TsHM",
+      authDomain: "codetodream-f0ed4.firebaseapp.com",
+      databaseURL: "https://codetodream-f0ed4-default-rtdb.firebaseio.com",
+      projectId: "codetodream-f0ed4",
+      storageBucket: "codetodream-f0ed4.appspot.com",
+      messagingSenderId: "197646785636",
+      appId: "1:197646785636:web:2a89663eea3baa10171371"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+    const storage = firebase.storage();
+
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.href = "register.html";
+      } else {
+        document.getElementById("userEmail").innerText = user.email;
+      }
+    });
+
+    document.getElementById("listingForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const imageFile = document.getElementById("imageFile").files[0];
+      const videoFile = document.getElementById("videoFile").files[0];
+      const type = document.getElementById("type").value;
+
+      if (!imageFile) {
+        alert("Image is required.");
+        return;
+      }
+
+      try {
+        const imageRef = storage.ref().child(`images/${Date.now()}_${imageFile.name}`);
+        await imageRef.put(imageFile);
+        const imageUrl = await imageRef.getDownloadURL();
+
+        let videoUrl = "";
+        if (videoFile) {
+          const videoRef = storage.ref().child(`videos/${Date.now()}_${videoFile.name}`);
+          await videoRef.put(videoFile);
+          videoUrl = await videoRef.getDownloadURL();
+        }
+
+        const listing = {
+          name: document.getElementById("name").value,
+          city: document.getElementById("city").value,
+          state: document.getElementById("state").value,
+          address: document.getElementById("address").value,
+          rate: parseInt(document.getElementById("rate").value),
+          facilities: document.getElementById("facilities").value,
+          description: document.getElementById("description").value,
+          imageUrl,
+          videoUrl
+        };
+
+        await db.ref(`${type}`).push(listing);
+        alert("Listing added successfully!");
+        document.getElementById("listingForm").reset();
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    });
+  </script>
+</body>
+
+</html>

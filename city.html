@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Listings in City</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    /* Navbar search styles */
+    #rateSearchInput {
+      max-width: 140px;
+    }
+    .navbar-brand {
+      font-size: 1.4rem;
+      color: #007bff;
+    }
+
+    .navbar .form-control {
+      min-width: 250px;
+    }
+    /* Listing Card */
+    .listing-card {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      cursor: pointer;
+      background: #fff;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      border: 1px solid transparent;
+    }
+    .listing-card:hover,
+    .listing-card:focus-visible {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+      outline: none;
+      border-color: #007bff;
+    }
+    .listing-img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-bottom: 1px solid #ddd;
+      transition: transform 0.3s ease;
+    }
+    .listing-card:hover .listing-img {
+      transform: scale(1.05);
+    }
+    .price-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #007bff;
+      color: white;
+      padding: 0.3rem 0.7rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      user-select: none;
+    }
+    .listing-body {
+      padding: 1rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .listing-body h5 {
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+      color: #212529;
+      min-height: 3rem; /* to keep consistent height */
+    }
+    .listing-body p {
+      margin-bottom: 0.3rem;
+      color: #495057;
+      font-size: 0.9rem;
+    }
+
+    /* No listings and loading text */
+    .no-listings, .loading-text {
+      margin-top: 2rem;
+      font-size: 1.1rem;
+      color: #777;
+      text-align: center;
+    }
+
+    /* Responsive grid adjustments */
+    @media (max-width: 575.98px) {
+      /* For xs (mobile) show 2 cards per row */
+      #listingsContainer > .col-md-4 {
+        flex: 0 0 50%;
+        max-width: 50%;
+      }
+
+      /* Adjust search form width on mobile */
+      #searchForm {
+        width: 100% !important;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+
+      #rateSearchInput {
+        max-width: 120px;
+        flex: 1;
+        min-width: 120px;
+      }
+    }
+
+    /* Keep 3 cards per row on md and up */
+    @media (min-width: 768px) {
+      #listingsContainer > .col-md-4 {
+        flex: 0 0 33.3333%;
+        max-width: 33.3333%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+      <!-- Brand -->
+     <a class="navbar-brand fw-bold d-flex flex-column" href="index.html" style="min-width: 120px;">
+      <span class="d-flex align-items-center">
+        <i class="bi bi-house-door-fill me-1 text-primary fs-4"></i>
+        <span>StayNest</span>
+      </span>
+      <small class="text-muted" style="font-size: 11px; line-height: 1;">Hostels • PGs • Flats</small>
+    </a>
+
+      <!-- Toggler -->
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#navmenu"
+        aria-controls="navmenu"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <!-- Navbar content -->
+      <div class="collapse navbar-collapse" id="navmenu">
+        <!-- Centered search -->
+        <form id="searchForm" class="d-flex mx-auto w-100 w-lg-25 mb-3 mb-lg-0" role="search">
+          <input
+            class="form-control rounded-pill shadow-sm me-2"
+            type="number"
+            placeholder="Search by approx. rate"
+            aria-label="Search by rate"
+            id="rateSearchInput"
+            name="rateSearchInput"
+            min="0"
+            step="100"
+          />
+          <button class="btn btn-primary rounded-pill px-4 shadow-sm" type="submit" aria-label="Search">
+            <i class="bi bi-search"></i> Search
+          </button>
+        </form>
+
+        <!-- Right side -->
+        <ul class="navbar-nav ms-auto align-items-center gap-2 gap-lg-0">
+          <li class="nav-item dropdown" id="authDropdown" style="display: none;">
+            <a
+              class="nav-link dropdown-toggle d-flex align-items-center"
+              href="#"
+              role="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              id="userDropdownToggle"
+            >
+              <i class="bi bi-person-circle me-1 fs-5"></i>
+              <span id="userNameDisplay" class="d-none d-sm-inline">My Account</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <a class="dropdown-item d-flex align-items-center" href="accountpage.html">
+                  <i class="bi bi-person-lines-fill me-2"></i>Account
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item d-flex align-items-center" href="#" id="logoutBtn">
+                  <i class="bi bi-box-arrow-right me-2"></i>Logout
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <li class="nav-item" id="loginSignupBtn" style="display: none;">
+            <a class="btn btn-outline-primary rounded-pill px-3 px-sm-4 d-flex align-items-center gap-2" href="login.html">
+              <i class="bi bi-box-arrow-in-right fs-5"></i>
+              <span class="d-none d-sm-inline">Login / Signup</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container my-5">
+    <h2 id="cityTitle" class="mb-4"></h2>
+    <div id="listingsContainer" class="row g-4">
+      <div class="loading-text">Checking login status...</div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBlqFFg5NHMpVmWon94ZPEXAIlhAW6TsHM",
+      authDomain: "codetodream-f0ed4.firebaseapp.com",
+      projectId: "codetodream-f0ed4",
+      storageBucket: "codetodream-f0ed4.appspot.com",
+      messagingSenderId: "197646785636",
+      appId: "1:197646785636:web:2a89663eea3baa10171371"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const listingsContainer = document.getElementById('listingsContainer');
+    const cityTitle = document.getElementById('cityTitle');
+    const searchForm = document.getElementById('searchForm');
+    const rateSearchInput = document.getElementById('rateSearchInput');
+
+    const authDropdown = document.getElementById('authDropdown');
+    const loginSignupBtn = document.getElementById('loginSignupBtn');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    const params = new URLSearchParams(window.location.search);
+    const city = params.get('city');
+
+    if (!city) {
+      cityTitle.textContent = 'No city specified';
+      listingsContainer.innerHTML = '<p class="no-listings">Please select a city from the homepage.</p>';
+    } else {
+      cityTitle.textContent = `Listings in "${city}"`;
+
+      // Store all listings to filter on search
+      let allListings = [];
+
+      onAuthStateChanged(auth, async (user) => {
+        listingsContainer.innerHTML = ''; // Clear loading
+
+        if (!user) {
+          authDropdown.style.display = 'none';
+          loginSignupBtn.style.display = 'block';
+
+          listingsContainer.innerHTML = `<p class="no-listings text-danger">You must be logged in to view listings. <a href="login.html">Login here</a></p>`;
+          return;
+        }
+
+        // User logged in
+        authDropdown.style.display = 'block';
+        loginSignupBtn.style.display = 'none';
+
+        userNameDisplay.textContent = user.displayName || user.email || 'My Account';
+
+        try {
+          const listingsQuery = query(collection(db, 'listings'), where('city', '==', city));
+          const querySnapshot = await getDocs(listingsQuery);
+
+          if (querySnapshot.empty) {
+            listingsContainer.innerHTML = '<p class="no-listings">No listings available for this city.</p>';
+            return;
+          }
+
+          allListings = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          displayListings(allListings);
+        } catch (error) {
+          listingsContainer.innerHTML = `<p class="text-danger">Error loading listings: ${error.message}</p>`;
+        }
+      });
+
+      function displayListings(listings) {
+        listingsContainer.innerHTML = '';
+        if (listings.length === 0) {
+          listingsContainer.innerHTML = '<p class="no-listings">No listings found.</p>';
+          return;
+        }
+        listings.forEach(data => {
+          const col = document.createElement('div');
+          col.className = 'col-md-4';
+
+          col.innerHTML = `
+            <article class="listing-card" tabindex="0" role="button" aria-label="View details for ${data.name}" 
+              onclick="window.location.href='listing.html?id=${data.id}'" 
+              onkeydown="if(event.key==='Enter' || event.key===' ') this.click();">
+              <img src="${data.image}" alt="${data.name}" class="listing-img" />
+              <div class="price-tag">₹${Number(data.offerPrice).toLocaleString()}</div>
+              <div class="listing-body">
+                <h5>${data.name}</h5>
+                <p><strong>Facilities:</strong> ${data.facilities?.join(', ') || 'N/A'}</p>
+              </div>
+            </article>
+          `;
+          listingsContainer.appendChild(col);
+        });
+      }
+
+      // Search form submit event to filter listings
+      searchForm.addEventListener('submit', event => {
+        event.preventDefault();
+        let filtered = allListings;
+
+        const rateVal = Number(rateSearchInput.value);
+
+        if (!isNaN(rateVal) && rateVal > 0) {
+          // Filter listings with offerPrice approx ±10% range
+          const tolerance = rateVal * 0.1;
+          filtered = filtered.filter(listing => {
+            const price = Number(listing.offerPrice);
+            return price >= rateVal - tolerance && price <= rateVal + tolerance;
+          });
+        }
+
+        displayListings(filtered);
+      });
+    }
+
+    logoutBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await signOut(auth);
+        window.location.reload();
+      } catch (error) {
+        alert('Logout failed: ' + error.message);
+      }
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

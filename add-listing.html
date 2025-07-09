@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Add Listing - Hostel, PG & Flat Booking</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    /* Cities horizontal scroll container */
+    #citiesContainer {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 12px;
+      padding: 10px 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .city-card {
+      flex: 0 0 auto;
+      width: 100px;
+      height: 80px;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      background: #fff;
+      text-align: center;
+      user-select: none;
+    }
+    .city-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: brightness(0.75);
+      transition: filter 0.25s ease, transform 0.25s ease;
+      border-radius: 10px 10px 0 0;
+    }
+    .city-card:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    }
+    .city-card:hover img {
+      filter: brightness(0.9);
+      transform: scale(1.05);
+    }
+    .city-label {
+      position: absolute;
+      bottom: 6px;
+      left: 8px;
+      right: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      text-shadow: 0 0 4px rgba(0,0,0,0.7);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Facilities checkboxes */
+    .facilities-group label {
+      margin-right: 15px;
+      cursor: pointer;
+    }
+    /* Listings container */
+    #listingsContainer .card {
+      transition: box-shadow 0.3s ease;
+      cursor: default;
+    }
+    #listingsContainer .card:hover {
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    /* Buttons inline in listings */
+    .listing-actions button {
+      margin-right: 10px;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-light">
+  <div class="container py-4">
+    <h2 class="mb-4 text-center">Add New Listing</h2>
+
+    <!-- Available Cities Section -->
+    <section>
+      <h5 class="fw-bold mb-2">📍 Available Cities</h5>
+      <div id="citiesContainer" aria-label="Available cities"></div>
+    </section>
+
+    <!-- Listing Form -->
+    <form id="listingForm" class="mx-auto mt-4" style="max-width: 600px;">
+      <div class="mb-3">
+        <label for="listingName" class="form-label">Listing Name</label>
+        <input type="text" id="listingName" class="form-control" placeholder="Enter listing name" required />
+      </div>
+
+      <div class="mb-3">
+        <label for="listingType" class="form-label">Type</label>
+        <select id="listingType" class="form-select" required>
+          <option value="" disabled selected>Select type</option>
+          <option value="Hostel">Hostel</option>
+          <option value="PG">PG</option>
+          <option value="Flat">Flat</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label for="listingCity" class="form-label">City</label>
+        <!-- datalist for autocomplete dropdown -->
+        <input list="cityList" id="listingCity" class="form-control" placeholder="Select or type city" required autocomplete="off" />
+        <datalist id="cityList"></datalist>
+      </div>
+
+      <div class="mb-3 row gx-3">
+        <div class="col-md-6">
+          <label for="actualPrice" class="form-label">Actual Price (₹)</label>
+          <input type="number" id="actualPrice" class="form-control" placeholder="Enter actual price" min="0" required />
+        </div>
+        <div class="col-md-6">
+          <label for="offerPrice" class="form-label">Offer Price (₹)</label>
+          <input type="number" id="offerPrice" class="form-control" placeholder="Enter offer price" min="0" required />
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="discountPercent" class="form-label">Discount %</label>
+        <input type="text" id="discountPercent" class="form-control" readonly />
+      </div>
+
+      <div class="mb-3">
+        <label for="listingImage" class="form-label">Image URL</label>
+        <input type="url" id="listingImage" class="form-control" placeholder="Enter image URL" required />
+      </div>
+
+      <fieldset class="mb-3 facilities-group">
+        <legend class="form-label">Facilities (select all that apply):</legend>
+        <label><input type="checkbox" value="WiFi" class="facility-checkbox" /> WiFi</label>
+        <label><input type="checkbox" value="24/7 Security" class="facility-checkbox" /> 24/7 Security</label>
+        <label><input type="checkbox" value="AC" class="facility-checkbox" /> AC</label>
+        <label><input type="checkbox" value="Laundry" class="facility-checkbox" /> Laundry</label>
+        <label><input type="checkbox" value="Food" class="facility-checkbox" /> Food</label>
+      </fieldset>
+
+      <button type="submit" class="btn btn-primary w-100">Add Listing</button>
+    </form>
+
+    <div id="msg" class="mt-3 text-center"></div>
+
+    <!-- Listings Display -->
+    <section class="mt-5">
+      <h4 class="fw-bold mb-3">🏠 All Listings</h4>
+      <div id="listingsContainer" class="row g-4"></div>
+    </section>
+  </div>
+
+<script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyBlqFFg5NHMpVmWon94ZPEXAIlhAW6TsHM",
+    authDomain: "codetodream-f0ed4.firebaseapp.com",
+    databaseURL: "https://codetodream-f0ed4-default-rtdb.firebaseio.com",
+    projectId: "codetodream-f0ed4",
+    storageBucket: "codetodream-f0ed4.appspot.com",
+    messagingSenderId: "197646785636",
+    appId: "1:197646785636:web:2a89663eea3baa10171371"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Elements
+  const citiesContainer = document.getElementById('citiesContainer');
+  const cityList = document.getElementById('cityList');
+  const form = document.getElementById('listingForm');
+  const msg = document.getElementById('msg');
+  const listingsContainer = document.getElementById('listingsContainer');
+  const discountPercentInput = document.getElementById('discountPercent');
+
+  // Load cities for top scroll and datalist
+  async function loadCities() {
+    citiesContainer.innerHTML = '<div class="text-muted px-3">Loading cities...</div>';
+    cityList.innerHTML = '';
+    try {
+      const snapshot = await db.collection('cities').orderBy('name').get();
+      if (snapshot.empty) {
+        citiesContainer.innerHTML = '<p class="text-center w-100">No cities available.</p>';
+        return;
+      }
+      citiesContainer.innerHTML = '';
+      snapshot.forEach(doc => {
+        const city = doc.data();
+        // Append city card
+        const div = document.createElement('div');
+        div.className = 'city-card';
+        div.title = city.name;
+        div.innerHTML = `
+          <img src="${city.image}" alt="${city.name}" />
+          <div class="city-label">${city.name}</div>
+        `;
+        citiesContainer.appendChild(div);
+
+        // Add to datalist
+        const option = document.createElement('option');
+        option.value = city.name;
+        cityList.appendChild(option);
+      });
+    } catch (err) {
+      citiesContainer.innerHTML = `<p class="text-danger w-100 text-center">Failed to load cities: ${err.message}</p>`;
+    }
+  }
+
+  // Calculate discount % based on actual & offer price
+  function calculateDiscount() {
+    const actual = parseFloat(document.getElementById('actualPrice').value);
+    const offer = parseFloat(document.getElementById('offerPrice').value);
+    if (actual && offer && actual > offer) {
+      const discount = ((actual - offer) / actual) * 100;
+      discountPercentInput.value = discount.toFixed(2) + '%';
+      return discount.toFixed(2);
+    }
+    discountPercentInput.value = '';
+    return 0;
+  }
+
+  // Listen for price changes to update discount
+  document.getElementById('actualPrice').addEventListener('input', calculateDiscount);
+  document.getElementById('offerPrice').addEventListener('input', calculateDiscount);
+
+  // Load all listings
+  async function loadListings() {
+    listingsContainer.innerHTML = '<p class="text-center text-muted">Loading listings...</p>';
+    try {
+      const snapshot = await db.collection('listings').orderBy('name').get();
+      if (snapshot.empty) {
+        listingsContainer.innerHTML = '<p class="text-center w-100">No listings found.</p>';
+        return;
+      }
+      listingsContainer.innerHTML = '';
+      snapshot.forEach(doc => {
+        const listing = doc.data();
+        const card = createListingCard(doc.id, listing);
+        listingsContainer.appendChild(card);
+      });
+    } catch (err) {
+      listingsContainer.innerHTML = `<p class="text-danger text-center">Error loading listings: ${err.message}</p>`;
+    }
+  }
+
+  // Create listing card element with edit/delete buttons
+  function createListingCard(id, listing) {
+    const div = document.createElement('div');
+    div.className = 'col-12 col-md-6 col-lg-4';
+    div.innerHTML = `
+      <div class="card h-100 shadow-sm">
+        <img src="${listing.image}" class="card-img-top" alt="${listing.name}" style="height: 180px; object-fit: cover;" />
+        <div class="card-body d-flex flex-column">
+          <h5 class="card-title">${listing.name}</h5>
+          <p class="mb-1">${listing.type} in <strong>${listing.city}</strong></p>
+          <p class="mb-1">Facilities: ${listing.facilities?.join(', ') || 'N/A'}</p>
+          <p class="mb-1 text-success">Offer Price: ₹${listing.offerPrice}</p>
+          <p class="mb-1 text-muted"><del>Actual Price: ₹${listing.actualPrice}</del></p>
+          <p class="mb-2 text-danger">Discount: ${listing.discountPercent || '0'}%</p>
+          <div class="mt-auto listing-actions">
+            <button class="btn btn-sm btn-outline-primary me-2" onclick="editListing('${id}')">Edit</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteListing('${id}')">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+    return div;
+  }
+
+  // Add or update listing on form submit
+  let editModeId = null; // null means new listing, otherwise edit existing
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const name = document.getElementById('listingName').value.trim();
+    const type = document.getElementById('listingType').value;
+    const city = document.getElementById('listingCity').value.trim();
+    const actualPrice = parseFloat(document.getElementById('actualPrice').value);
+    const offerPrice = parseFloat(document.getElementById('offerPrice').value);
+    const discountPercent = calculateDiscount();
+    const image = document.getElementById('listingImage').value.trim();
+
+    // Gather selected facilities
+    const facilitiesCheckboxes = document.querySelectorAll('.facility-checkbox');
+    const facilities = [];
+    facilitiesCheckboxes.forEach(cb => {
+      if (cb.checked) facilities.push(cb.value);
+    });
+
+    if (!name || !type || !city || !actualPrice || !offerPrice || !image) {
+      msg.textContent = "Please fill in all required fields.";
+      msg.className = "text-danger";
+      return;
+    }
+    if (actualPrice < offerPrice) {
+      msg.textContent = "Offer price cannot be more than actual price.";
+      msg.className = "text-danger";
+      return;
+    }
+
+    const listingData = {
+      name,
+      type,
+      city,
+      actualPrice,
+      offerPrice,
+      discountPercent,
+      image,
+      facilities,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    msg.textContent = editModeId ? "Updating listing..." : "Adding listing...";
+    msg.className = "text-muted";
+
+    try {
+      if (editModeId) {
+        await db.collection('listings').doc(editModeId).update(listingData);
+        msg.textContent = "Listing updated successfully!";
+        editModeId = null;
+        form.querySelector('button[type="submit"]').textContent = "Add Listing";
+      } else {
+        await db.collection('listings').add(listingData);
+        msg.textContent = "Listing added successfully!";
+      }
+      form.reset();
+      discountPercentInput.value = '';
+      loadListings();
+    } catch (err) {
+      msg.textContent = "Error saving listing: " + err.message;
+      msg.className = "text-danger";
+    }
+  });
+
+  // Edit listing: populate form with data
+  window.editListing = async function(id) {
+    msg.textContent = "Loading listing data...";
+    msg.className = "text-muted";
+
+    try {
+      const doc = await db.collection('listings').doc(id).get();
+      if (!doc.exists) {
+        msg.textContent = "Listing not found.";
+        msg.className = "text-danger";
+        return;
+      }
+      const data = doc.data();
+      document.getElementById('listingName').value = data.name || '';
+      document.getElementById('listingType').value = data.type || '';
+      document.getElementById('listingCity').value = data.city || '';
+      document.getElementById('actualPrice').value = data.actualPrice || '';
+      document.getElementById('offerPrice').value = data.offerPrice || '';
+      discountPercentInput.value = data.discountPercent ? data.discountPercent + '%' : '';
+      document.getElementById('listingImage').value = data.image || '';
+      // Facilities checkboxes
+      const facilitiesCheckboxes = document.querySelectorAll('.facility-checkbox');
+      facilitiesCheckboxes.forEach(cb => {
+        cb.checked = data.facilities?.includes(cb.value) || false;
+      });
+
+      editModeId = id;
+      form.querySelector('button[type="submit"]').textContent = "Update Listing";
+      msg.textContent = "Edit mode: Update the details and submit.";
+    } catch (err) {
+      msg.textContent = "Error loading listing: " + err.message;
+      msg.className = "text-danger";
+    }
+  };
+
+  // Delete listing
+  window.deleteListing = async function(id) {
+    if (!confirm("Are you sure you want to delete this listing?")) return;
+
+    msg.textContent = "Deleting listing...";
+    msg.className = "text-muted";
+
+    try {
+      await db.collection('listings').doc(id).delete();
+      msg.textContent = "Listing deleted.";
+      loadListings();
+    } catch (err) {
+      msg.textContent = "Error deleting listing: " + err.message;
+      msg.className = "text-danger";
+    }
+  };
+
+  // Initialize
+  window.onload = function() {
+    loadCities();
+    loadListings();
+  };
+</script>
+
+</body>
+</html>
